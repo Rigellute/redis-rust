@@ -47,12 +47,8 @@ async fn main() -> Result<()> {
 async fn handle_connection(stream: TcpStream, store: Arc<Mutex<Store>>) -> Result<()> {
     let mut conn = Connection::new(stream);
 
-    loop {
-        if let Some(frame) = conn.read_value().await? {
-            dbg!(frame);
-        } else {
-            break;
-        };
+    while let Some(frame) = conn.read_value().await? {
+        dbg!(frame);
     }
 
     Ok(())
