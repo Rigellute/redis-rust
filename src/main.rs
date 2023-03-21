@@ -1,3 +1,4 @@
+mod command;
 mod connection;
 mod frame;
 mod store;
@@ -6,12 +7,15 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use connection::Connection;
+use frame::Frame;
+use store::Value;
 use tokio::{
     net::{TcpListener, TcpStream},
     time,
     time::Duration,
 };
 
+use crate::command::Command;
 use crate::store::Store;
 
 #[tokio::main]
@@ -47,8 +51,32 @@ async fn main() -> Result<()> {
 async fn handle_connection(stream: TcpStream, store: Arc<Mutex<Store>>) -> Result<()> {
     let mut conn = Connection::new(stream);
 
-    while let Some(frame) = conn.read_value().await? {
-        dbg!(frame);
+    loop {
+        let maybe_frame = conn.read_value().await?;
+        if let Some(frame) = maybe_frame {
+            let command = frame.to_command()?;
+            let response_frame = match command {
+                Command::Get(key) => match store.lock().unwrap().get(&key) {
+                    Some(found) => Frame::Bulk(found.value.clone()),
+                    None => Frame::Null,
+                },
+                Command::Set(key, value, expiry) => {
+                    let value = Value {
+                        value: value.clone(),
+                        expiry,
+                    };
+
+                    store.lock().unwrap().set(key.clone(), value);
+
+                    Frame::Simple("OK".to_string())
+                }
+                Command::Echo(to_echo) => Frame::Bulk(to_echo.clone()),
+                Command::Ping => Frame::Simple("PONG".to_string()),
+            };
+            conn.write_value(response_frame).await?;
+        } else {
+            break;
+        }
     }
 
     Ok(())

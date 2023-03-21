@@ -1,6 +1,9 @@
 use anyhow::Result;
 use bytes::BytesMut;
-use tokio::{io::AsyncReadExt, net::TcpStream};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
 
 use crate::frame::Frame;
 
@@ -32,5 +35,11 @@ impl Connection {
                 return Ok(Some(frame));
             };
         }
+    }
+
+    pub async fn write_value(&mut self, frame: Frame) -> Result<()> {
+        self.stream.write_all(frame.encode().as_bytes()).await?;
+
+        Ok(())
     }
 }

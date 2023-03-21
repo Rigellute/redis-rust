@@ -6,14 +6,17 @@ use nom::{IResult, Parser};
 use nom_supreme::error::ErrorTree;
 use nom_supreme::tag::complete::tag;
 use std::str;
+use std::time::Duration;
 use thiserror::Error;
+
+use crate::command::Command;
+use crate::store::Expiry;
 
 /// Terminating bytes between frames.
 pub const CRLF: &str = "\r\n";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Frame {
-    Error(String),
     Simple(String),
     Bulk(String),
     Null,
@@ -24,6 +27,10 @@ pub enum Frame {
 pub enum Errors {
     #[error("error parsing input")]
     ParseError(String),
+    #[error("frame is not recognized")]
+    Unrecognised,
+    #[error("input is incomplete")]
+    Incomplete,
 }
 
 impl Frame {
@@ -32,6 +39,66 @@ impl Frame {
         match parsed {
             Ok((_, frame)) => Ok(frame),
             Err(e) => Err(Errors::ParseError(e.to_string())),
+        }
+    }
+
+    fn unwrap_bulk(&self) -> String {
+        match self {
+            Frame::Bulk(str) => str.clone(),
+            _ => panic!("not a bulk string"),
+        }
+    }
+
+    pub fn to_command(&self) -> Result<Command> {
+        let (command, args) = match self {
+            Frame::Array(items) => Ok((
+                items.first().unwrap().unwrap_bulk(),
+                items.clone().into_iter().skip(1).collect::<Vec<Frame>>(),
+            )),
+            _ => Err(Errors::Unrecognised),
+        }?;
+
+        match command.to_uppercase().as_str() {
+            "PING" => Ok(Command::Ping),
+            "GET" => match args.get(0) {
+                Some(Frame::Bulk(key)) => Ok(Command::Get(key.to_string())),
+                _ => Err(Errors::Incomplete.into()),
+            },
+            "ECHO" => match args.get(0) {
+                Some(Frame::Bulk(to_echo)) => Ok(Command::Echo(to_echo.to_string())),
+                _ => Err(Errors::Incomplete.into()),
+            },
+            "SET" => match (args.get(0), args.get(1), args.get(2), args.get(3)) {
+                (
+                    Some(Frame::Bulk(key)),
+                    Some(Frame::Bulk(value)),
+                    Some(Frame::Bulk(exp_type)),
+                    Some(Frame::Bulk(exp_amount)),
+                ) => {
+                    let amount: u64 = exp_amount.parse()?;
+                    let duration = match exp_type.to_uppercase().as_ref() {
+                        "PX" => Some(Duration::from_millis(amount)),
+                        "EX" => Some(Duration::from_secs(amount)),
+                        _ => None,
+                    };
+
+                    let expiry = duration.map(Expiry::new);
+
+                    Ok(Command::Set(key.to_string(), value.to_string(), expiry))
+                }
+                _ => Err(Errors::Incomplete.into()),
+            },
+            _ => Err(Errors::Unrecognised.into()),
+        }
+    }
+
+    pub fn encode(&self) -> String {
+        match self {
+            Frame::Simple(s) => format!("+{}\r\n", s.as_str()),
+            Frame::Bulk(s) => format!("${}\r\n{}\r\n", s.chars().count(), s),
+            Frame::Null => "$-1\r\n".to_string(),
+            // The other cases are not required for the codecrafters challendge
+            _ => unimplemented!(),
         }
     }
 }
@@ -56,11 +123,12 @@ fn decode_nom(input: &str) -> IResult<&str, Option<Frame>, ErrorTree<&str>> {
             Ok((input, Some(Frame::Array(array))))
         }
         "+" => {
-            unimplemented!()
+            let (input, simple) = parse_line(input)?;
+            Ok((input, Some(Frame::Simple(simple.to_string()))))
         }
         "$" => {
-            // We are not currently caring about the length of bulk strings, as we allocate the
-            // line anyway
+            // We are not currently caring about the length of bulk strings, as we parse until the
+            // CRLF
             let (input, _) = parse_len(input)?;
             let (input, bulk) = parse_line(input)?;
             Ok((input, Some(Frame::Bulk(bulk.to_string()))))
