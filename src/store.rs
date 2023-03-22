@@ -33,6 +33,10 @@ impl Store {
     }
 
     pub fn clean_up(&mut self) {
+        // This is super inefficient as it loops through all the keys in the store checking for expiry.
+        // But this solution is sufficient to pass the codecrafters tests.
+        // Perhaps a better solution would be to keep another data structure with keys sorted by
+        // expiry time. This way, we can exit the loop early once we reach the non-expiring keys.
         for (key, value) in self.db.clone() {
             if let Some(expiry) = value.expiry {
                 if expiry.instant.elapsed() > expiry.duration {

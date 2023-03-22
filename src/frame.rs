@@ -17,6 +17,7 @@ pub const CRLF: &str = "\r\n";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Frame {
+    Error(String),
     Simple(String),
     Bulk(String),
     Null,
@@ -68,21 +69,21 @@ impl Frame {
                 Some(Frame::Bulk(to_echo)) => Ok(Command::Echo(to_echo.to_string())),
                 _ => Err(Errors::Incomplete.into()),
             },
-            "SET" => match (args.get(0), args.get(1), args.get(2), args.get(3)) {
-                (
-                    Some(Frame::Bulk(key)),
-                    Some(Frame::Bulk(value)),
-                    Some(Frame::Bulk(exp_type)),
-                    Some(Frame::Bulk(exp_amount)),
-                ) => {
-                    let amount: u64 = exp_amount.parse()?;
-                    let duration = match exp_type.to_uppercase().as_ref() {
-                        "PX" => Some(Duration::from_millis(amount)),
-                        "EX" => Some(Duration::from_secs(amount)),
+            "SET" => match (args.get(0), args.get(1)) {
+                (Some(Frame::Bulk(key)), Some(Frame::Bulk(value))) => {
+                    let expiry = match (args.get(2), args.get(3)) {
+                        (Some(Frame::Bulk(exp_type)), Some(Frame::Bulk(exp_amount))) => {
+                            let amount: u64 = exp_amount.parse()?;
+                            let duration = match exp_type.to_uppercase().as_ref() {
+                                "PX" => Some(Duration::from_millis(amount)),
+                                "EX" => Some(Duration::from_secs(amount)),
+                                _ => None,
+                            };
+
+                            duration.map(Expiry::new)
+                        }
                         _ => None,
                     };
-
-                    let expiry = duration.map(Expiry::new);
 
                     Ok(Command::Set(key.to_string(), value.to_string(), expiry))
                 }
@@ -94,10 +95,11 @@ impl Frame {
 
     pub fn encode(&self) -> String {
         match self {
+            Frame::Error(msg) => format!("-{}\r\n", msg.as_str()),
             Frame::Simple(s) => format!("+{}\r\n", s.as_str()),
             Frame::Bulk(s) => format!("${}\r\n{}\r\n", s.chars().count(), s),
             Frame::Null => "$-1\r\n".to_string(),
-            // The other cases are not required for the codecrafters challendge
+            // The other cases are not required for the codecrafters challenge
             _ => unimplemented!(),
         }
     }
@@ -133,7 +135,6 @@ fn decode_nom(input: &str) -> IResult<&str, Option<Frame>, ErrorTree<&str>> {
             let (input, bulk) = parse_line(input)?;
             Ok((input, Some(Frame::Bulk(bulk.to_string()))))
         }
-
         _ => unimplemented!(),
     }
 }

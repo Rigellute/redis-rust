@@ -26,7 +26,7 @@ async fn main() -> Result<()> {
     let store = Store::new();
     let store = Arc::new(Mutex::new(store));
 
-    // Start a task to clean up expired values
+    // Start a background task to clean up expired values
     let cloned_store = store.clone();
     tokio::spawn(async move {
         let mut interval = time::interval(Duration::from_millis(1));
@@ -54,24 +54,26 @@ async fn handle_connection(stream: TcpStream, store: Arc<Mutex<Store>>) -> Resul
     loop {
         let maybe_frame = conn.read_value().await?;
         if let Some(frame) = maybe_frame {
-            let command = frame.to_command()?;
-            let response_frame = match command {
-                Command::Get(key) => match store.lock().unwrap().get(&key) {
-                    Some(found) => Frame::Bulk(found.value.clone()),
-                    None => Frame::Null,
+            let response_frame = match frame.to_command() {
+                Ok(command) => match command {
+                    Command::Get(key) => match store.lock().unwrap().get(&key) {
+                        Some(found) => Frame::Bulk(found.value.clone()),
+                        None => Frame::Null,
+                    },
+                    Command::Set(key, value, expiry) => {
+                        let value = Value {
+                            value: value.clone(),
+                            expiry,
+                        };
+
+                        store.lock().unwrap().set(key.clone(), value);
+
+                        Frame::Simple("OK".to_string())
+                    }
+                    Command::Echo(to_echo) => Frame::Bulk(to_echo.clone()),
+                    Command::Ping => Frame::Simple("PONG".to_string()),
                 },
-                Command::Set(key, value, expiry) => {
-                    let value = Value {
-                        value: value.clone(),
-                        expiry,
-                    };
-
-                    store.lock().unwrap().set(key.clone(), value);
-
-                    Frame::Simple("OK".to_string())
-                }
-                Command::Echo(to_echo) => Frame::Bulk(to_echo.clone()),
-                Command::Ping => Frame::Simple("PONG".to_string()),
+                Err(e) => Frame::Error(e.to_string()),
             };
             conn.write_value(response_frame).await?;
         } else {
