@@ -26,7 +26,7 @@ pub enum Frame {
 
 #[derive(Debug, Error)]
 pub enum Errors {
-    #[error("error parsing input")]
+    #[error("error parsing input: `{0}`")]
     ParseError(String),
     #[error("frame is not recognized")]
     Unrecognised,
