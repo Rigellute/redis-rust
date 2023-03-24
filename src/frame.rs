@@ -4,7 +4,9 @@ use nom::combinator::map_res;
 use nom::sequence::terminated;
 use nom::{IResult, Parser};
 use nom_supreme::error::ErrorTree;
+use nom_supreme::final_parser::final_parser;
 use nom_supreme::tag::complete::tag;
+use nom_supreme::ParserExt;
 use std::str;
 use std::time::Duration;
 use thiserror::Error;
@@ -36,9 +38,9 @@ pub enum Errors {
 
 impl Frame {
     pub fn decode(input: &str) -> Result<Option<Frame>, Errors> {
-        let parsed = decode_nom(input);
+        let parsed: Result<Option<Frame>, ErrorTree<&str>> = final_parser(decode_nom)(input);
         match parsed {
-            Ok((_, frame)) => Ok(frame),
+            Ok(frame) => Ok(frame),
             Err(e) => Err(Errors::ParseError(e.to_string())),
         }
     }
@@ -144,7 +146,9 @@ fn parse_len(input: &str) -> IResult<&str, usize, ErrorTree<&str>> {
 }
 
 fn parse_line(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
-    terminated(take_until(CRLF), tag(CRLF)).parse(input)
+    terminated(take_until(CRLF), tag(CRLF))
+        .context("Expected input to be terminated by CRLF")
+        .parse(input)
 }
 
 #[cfg(test)]
