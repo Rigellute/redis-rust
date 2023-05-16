@@ -19,14 +19,14 @@ use crate::command::Command;
 use crate::store::Store;
 
 pub async fn run(listener: TcpListener) -> Result<()> {
-    // let listener = TcpListener::bind("127.0.0.1:6379").await?;
-    let addr = listener.local_addr().unwrap().to_string();
-    println!("Server listening on {}", addr);
+    let addr = listener.local_addr()?.to_string();
+    println!("Server listening on {addr}");
 
     let store = Store::new();
     let store = Arc::new(Mutex::new(store));
 
     // Start a background task to clean up expired values
+    // NOT inefficient
     let cloned_store = store.clone();
     tokio::spawn(async move {
         let mut interval = time::interval(Duration::from_millis(1));
@@ -43,7 +43,7 @@ pub async fn run(listener: TcpListener) -> Result<()> {
         let store = store.clone();
         tokio::spawn(async move {
             if let Err(e) = handle_connection(socket, store).await {
-                println!("Error handling request: {}", e);
+                println!("Error handling request: {e}");
             };
         });
     }

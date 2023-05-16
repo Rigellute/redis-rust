@@ -102,7 +102,7 @@ impl Frame {
             Frame::Bulk(s) => format!("${}\r\n{}\r\n", s.chars().count(), s),
             Frame::Null => "$-1\r\n".to_string(),
             // The other cases are not required for the codecrafters challenge
-            _ => unimplemented!(),
+            Frame::Array(_) => unimplemented!(),
         }
     }
 }
@@ -142,7 +142,7 @@ fn decode_nom(input: &str) -> IResult<&str, Option<Frame>, ErrorTree<&str>> {
 }
 
 fn parse_len(input: &str) -> IResult<&str, usize, ErrorTree<&str>> {
-    map_res(parse_line, |s: &str| s.parse())(input)
+    map_res(parse_line, str::parse)(input)
 }
 
 fn parse_line(input: &str) -> IResult<&str, &str, ErrorTree<&str>> {
