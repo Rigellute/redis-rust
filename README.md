@@ -12,3 +12,23 @@ A toy Redis clone in Rust following the [codecrafters](https://app.codecrafters.
   - `GET`
   - `SET` with optional expiry
 
+## Run locally
+
+In one terminal, start our toy Redis server:
+
+```sh
+cargo run
+```
+
+And then use the `redis-cli` to query our server:
+
+```
+$ redis-cli PING
+PONG
+$ redis-cli ECHO 'Hello World!'
+"Hello World!"
+$ redis-cli SET myKey 1234
+OK
+$ redis-cli GET myKey
+"1234"
+```
