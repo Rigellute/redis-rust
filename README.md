@@ -1,8 +1,10 @@
-A toy Redis clone in Rust following the [codecrafters](https://app.codecrafters.io/courses/redis/overview) course.
+# 🪀 Toy Redis Clone in Rust 🚀
+
+A basic implementation of Redis in Rust following the [codecrafters](https://app.codecrafters.io/courses/redis/overview) course.
 
 ![](demo.gif)
 
-## Features
+## ✨ Features
 
 - Parse the [Redis serialization protocol (RESP) specification](https://redis.io/docs/reference/protocol-spec/)
 - Handle concurrent connections
@@ -11,8 +13,9 @@ A toy Redis clone in Rust following the [codecrafters](https://app.codecrafters.
   - `ECHO`
   - `GET`
   - `SET` with optional expiry
+- Integration tests
 
-## Run locally
+## 👷‍♂️ Run locally
 
 In one terminal, start our toy Redis server:
 
@@ -32,3 +35,10 @@ OK
 $ redis-cli GET myKey
 "1234"
 ```
+
+## 🧪 Run tests
+
+```sh
+cargo test
+```
+
