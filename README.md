@@ -1,6 +1,6 @@
 # 🪀 Toy Redis Clone in Rust 🚀
 
-A basic implementation of Redis in Rust following the [codecrafters](https://app.codecrafters.io/courses/redis/overview) course.
+Purely for fun and learning, kicked off by following the excellent [codecrafters](https://app.codecrafters.io/courses/redis/overview) Redis course.
 
 ![](demo.gif)
 
