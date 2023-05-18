@@ -1,3 +1,4 @@
+![](https://app.codecrafters.io/progress/redis/f38ed37d-5ae1-4538-a5ac-4ecda7caee92)
 # 🪀 Toy Redis Clone in Rust 🚀
 
 Purely for fun and learning, kicked off by following the excellent [codecrafters](https://app.codecrafters.io/courses/redis/overview) Redis course.
